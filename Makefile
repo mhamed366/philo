@@ -12,7 +12,7 @@ makelibft :
 	@make -C libft/
 
 $(NAME) : $(OBJ)
-	$(CC) $(CFLAGS) -o $(NAME) $(OBJ) $(libft_bin)
+	$(CC) $(CFLAGS) -lpthread -o $(NAME) $(OBJ) $(libft_bin)
 
 cleanLibft :
 	@make -C libft/ clean

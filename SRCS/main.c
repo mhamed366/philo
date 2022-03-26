@@ -6,46 +6,78 @@
 /*   By: mkchikec <mkchikec@student.1337.ma>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/03/01 16:45:36 by mkchikec          #+#    #+#             */
-/*   Updated: 2022/03/23 21:52:41 by mkchikec         ###   ########.fr       */
+/*   Updated: 2022/03/26 22:57:17 by mkchikec         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "../philo.h"
 
-void*	process(void* arg)
+void	print(t_philo *all, char *s)
+{
+	pthread_mutex_lock(&(all->all->print));
+	printf("%d %s", all->id, s);
+	pthread_mutex_unlock(&(all->all->print));
+}
+
+int		curr_time()
 {
 	struct	timeval	time;
+	gettimeofday(&time, NULL);
+	return time.tv_sec;
+}
+
+void	eat_think_sleep(t_philo *all)
+{
 	int				left;
 	int				right;
-	t_all			*all;
-	int				lock;
 
-	all = arg;
-	left = ((all->curr - 1) + all->args.philo_count) % all->args.philo_count;
-	right = (all->curr + 1) % all->args.philo_count;
-	gettimeofday(&time, NULL);
+	left = all->id;
+	right = (all->id + 1) % all->all->args.philo_count;
+	pthread_mutex_lock(&(all->all->fork[left]));
+	print(all, "taken 1st fork\n");
+	// printf("%d taken 1st fork\n", all->id);
+	pthread_mutex_lock(&(all->all->fork[right]));
+	print(all, "taken 2nd fork\n");
+	print(all, "taken forks\n");
+	print(all, "is eating\n");
+	usleep(all->all->args.eat_time * 1000);
+	all->last_time_ate = curr_time();
+	pthread_mutex_unlock(&(all->all->fork[left]));
+	pthread_mutex_unlock(&(all->all->fork[right]));
+	print(all, "is sleeping\n");
+	usleep(all->all->args.sleep_time * 1000);
+	print(all, "is thinking\n");
+	// print(all, "gave up forks\n");
+}
+
+void	*check_death(void *arg)
+{
+	t_philo		*philo;
+	t_counter	counter;
+
+	philo = arg;
 	while (1)
 	{
-		lock = 0;
-		while (!lock)
+		counter.i = -1;
+		while (++counter.i < philo->all->args.philo_count)
 		{
-			pthread_mutex_lock(&(all->fork));
-			if (all->count[left] || all->count[right])
+			if (philo->last_time_ate + philo->all->args.eat_time < curr_time())
 			{
-				pthread_mutex_unlock(&(all->fork));
-				printf("error %d forks taken\n", all->curr);
+				print(philo, "DIED\n");
+				exit(0);
 			}
-			all->count[left] = 1;
-			all->count[right] = 1;
-			pthread_mutex_unlock(&(all->fork));	
-			lock = 1;			
 		}
-		pthread_mutex_lock(&(all->fork));
-		all->count[left] = 0;
-		all->count[right] = 0;
-		pthread_mutex_unlock(&(all->fork));
-		printf("%d taken a fork\n", all->curr);
 	}
+}
+
+void*	process(void* arg)
+{
+	t_philo	*philo;
+
+	philo = (t_philo *)arg;
+	pthread_create(&(philo->all->death), NULL, &check_death, arg);
+	while (1)
+		eat_think_sleep((t_philo *)arg);
 	return NULL;
 }
 
@@ -53,27 +85,38 @@ void	run(t_all *all)
 {
 	t_counter	counter;
 
+	pthread_mutex_init(&(all->print), NULL);
 	counter.i = -1;
+	while (++counter.i < all->args.philo_count)
+	{
+		pthread_mutex_init(&(all->fork[counter.i]), NULL);
+		all->philos[counter.i].id = counter.i;
+		all->philos[counter.i].died = 0;
+		all->philos[counter.i].times_eaten = 0;
+		all->philos[counter.i].all = all;
+	}
 	
 	counter.i = -1;
 	while (++counter.i < all->args.philo_count)
 	{
-		all->curr = counter.i;
-		pthread_create(&(all->philo[counter.i]), NULL, process, all);
-		usleep(1);
+		if (pthread_create(&(all->philo[counter.i]), NULL, &process, &(all->philos[counter.i])) != 0)
+		{
+			printf("ERROR\n");
+			exit(0);
+		}			
+		usleep(100);
 	}
 	counter.i = -1;
 	while (++counter.i < all->args.philo_count)
 	{
 		pthread_join(all->philo[counter.i], NULL);
 	}
-	printf("0: %d\n",all->count[0]);
 }
 
 int		main(int ac, char **av)
 {
 	pthread_t		*philo;
-	pthread_mutex_t	fork;
+	pthread_mutex_t	*fork;
 	t_args			args;
 	t_all			all;
 	struct			timeval	time;
@@ -94,9 +137,8 @@ int		main(int ac, char **av)
 	else
 		args.eat_count = -1;
 	philo = malloc(args.philo_count * sizeof(pthread_t));
-	all.count = malloc(sizeof(int) * args.philo_count);
-	memset(all.count, 0, sizeof(int) * args.philo_count);	
-	pthread_mutex_init(&(fork), NULL);
+	fork = malloc(args.philo_count * sizeof(pthread_mutex_t));
+	all.philos = malloc(sizeof(t_philo) * args.philo_count);
 	all.philo = philo;
 	all.fork = fork;
 	all.args = args;

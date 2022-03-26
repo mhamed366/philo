@@ -6,7 +6,7 @@
 /*   By: mkchikec <mkchikec@student.1337.ma>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/03/01 16:44:00 by mkchikec          #+#    #+#             */
-/*   Updated: 2022/03/23 21:32:58 by mkchikec         ###   ########.fr       */
+/*   Updated: 2022/03/26 22:54:09 by mkchikec         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -31,6 +31,15 @@ typedef struct s_args {
 	long int	start_time;
 }	t_args;
 
+typedef struct s_philo {
+	struct s_all		*all;
+	int			id;
+	long		last_time_ate;
+	int			times_eaten;
+	long int	start_time;
+	int			died;
+}	t_philo;
+
 typedef struct s_counter {
 	int	i;
 	int	j;
@@ -39,8 +48,10 @@ typedef struct s_counter {
 
 typedef struct s_all {
 	pthread_t		*philo;
-	pthread_mutex_t	fork;
-	int				*count;
+	pthread_t		death;
+	pthread_mutex_t	*fork;
+	pthread_mutex_t	print;
+	t_philo			*philos;
 	t_args			args;
 	int				curr;
 }	t_all;
