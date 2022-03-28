@@ -1,5 +1,6 @@
 NAME = philo
-SRC =	SRCS/main.c
+SRC =	SRCS/main.c\
+		SRCS/utils.c
 
 libft_bin = libft/libft.a
 OBJ = $(SRC:.c=.o)
